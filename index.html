@@ -80,6 +80,9 @@
                     MASUK SEKARANG
                 </button>
             </form>
+            <div id="setup-status" class="p-4 bg-green-50 text-green-600 text-[10px] text-center font-bold">
+                ✅ Firebase Connected: absensi-wajah-a5262
+            </div>
         </div>
     </div>
 
@@ -169,7 +172,6 @@
         </header>
 
         <div id="content-area" class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-slate-50/50">
-            
             <!-- Dashboard -->
             <div id="page-dashboard" class="page-content space-y-6">
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
@@ -200,7 +202,7 @@
                 </div>
             </div>
 
-            <!-- All Settings Unified -->
+            <!-- Page Settings -->
             <div id="page-settings" class="page-content hidden">
                 <div class="max-w-5xl mx-auto flex flex-col gap-6">
                     <div class="flex overflow-x-auto gap-2 pb-2 no-scrollbar">
@@ -211,8 +213,6 @@
                     </div>
 
                     <div id="settings-content" class="bg-white p-6 md:p-10 rounded-[2.5rem] shadow-sm border">
-                        
-                        <!-- Tab Identitas -->
                         <div id="set-identity" class="settings-tab-section space-y-6">
                             <h3 class="text-xl font-bold text-slate-800 mb-6">Identitas Pesantren</h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -226,8 +226,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Tab Master Data -->
                         <div id="set-master" class="settings-tab-section hidden space-y-8">
                             <div>
                                 <h3 class="text-xl font-bold text-slate-800 mb-2">Manajemen Tingkatan</h3>
@@ -237,7 +235,6 @@
                                 </div>
                                 <div class="flex flex-wrap gap-2" id="list-tingkatan"></div>
                             </div>
-
                             <div>
                                 <h3 class="text-xl font-bold text-slate-800 mb-2">Manajemen Kelas</h3>
                                 <div class="flex gap-2 mb-4">
@@ -246,7 +243,6 @@
                                 </div>
                                 <div class="flex flex-wrap gap-2" id="list-kelas"></div>
                             </div>
-
                             <div>
                                 <h3 class="text-xl font-bold text-slate-800 mb-2">Manajemen Mapel</h3>
                                 <div class="flex gap-2 mb-4">
@@ -256,8 +252,6 @@
                                 <div class="flex flex-wrap gap-2" id="list-mapel"></div>
                             </div>
                         </div>
-
-                        <!-- Tab Jadwal -->
                         <div id="set-jadwal" class="settings-tab-section hidden space-y-6">
                             <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                                 <h3 class="text-xl font-bold text-slate-800">Jadwal Mingguan</h3>
@@ -265,13 +259,10 @@
                             </div>
                             <div id="jadwal-editor-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
                         </div>
-
-                        <!-- Tab Petugas -->
                         <div id="set-petugas" class="settings-tab-section hidden space-y-6">
                             <h3 class="text-xl font-bold text-slate-800 mb-6">Pengurus Penerima Laporan</h3>
                             <div id="officer-inputs" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                         </div>
-
                         <div class="mt-10 pt-6 border-t flex justify-end">
                             <button onclick="window.saveAllSettings()" class="w-full md:w-auto bg-blue-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg shadow-blue-100 transition-all hover:bg-blue-700">SIMPAN SEMUA PERUBAHAN</button>
                         </div>
@@ -300,7 +291,6 @@
                 </div>
             </div>
 
-            <!-- Page Santri Aktif -->
             <div id="page-aktif" class="page-content hidden">
                 <div class="bg-white rounded-[2rem] shadow-sm border overflow-hidden">
                     <div class="p-6 bg-slate-50 border-b flex justify-between items-center">
@@ -317,7 +307,6 @@
                 </div>
             </div>
 
-            <!-- Scan Wajah -->
             <div id="page-scan-wajah" class="page-content hidden">
                 <div class="max-w-4xl mx-auto flex flex-col gap-6">
                     <div class="bg-black aspect-video rounded-[2.5rem] overflow-hidden relative">
@@ -332,7 +321,6 @@
                 </div>
             </div>
 
-            <!-- Page Santri Baru -->
             <div id="page-masuk" class="page-content hidden">
                 <div class="max-w-xl mx-auto bg-white p-8 rounded-[2.5rem] shadow-sm border">
                     <h3 class="text-xl font-bold mb-6">Pendaftaran Santri</h3>
@@ -346,7 +334,6 @@
                 </div>
             </div>
 
-            <!-- Rekap -->
             <div id="page-rekap" class="page-content hidden">
                 <div class="bg-white rounded-[2rem] border overflow-hidden">
                     <table class="w-full text-left text-sm">
@@ -356,7 +343,6 @@
                 </div>
             </div>
 
-            <!-- Laporan Petugas -->
             <div id="page-notifikasi" class="page-content hidden">
                 <div id="notification-list-mobile" class="space-y-4"></div>
             </div>
@@ -375,18 +361,45 @@
         </div>
     </div>
 
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-10 right-10 bg-green-600 text-white px-8 py-4 rounded-2xl shadow-2xl transform translate-y-24 opacity-0 transition-all duration-500 z-[400]">
+        <i class="fas fa-info-circle mr-2"></i><span id="toast-msg"></span>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- GLOBAL SETUP ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'nailul-muna-v4-1';
+        /**
+         * ==========================================
+         * KONFIGURASI FIREBASE ANDA (TERISI OTOMATIS)
+         * ==========================================
+         */
+        const myFirebaseConfig = {
+            apiKey: "AIzaSyA3USbfzVYgH0zpmHlYewurFeFSC4P_y28",
+            authDomain: "absensi-wajah-a5262.firebaseapp.com",
+            databaseURL: "https://absensi-wajah-a5262-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "absensi-wajah-a5262",
+            storageBucket: "absensi-wajah-a5262.firebasestorage.app",
+            messagingSenderId: "136628217360",
+            appId: "1:136628217360:web:588f892c0910238ffacc95",
+            measurementId: "G-LL6E6Z1TSX"
+        };
+
+        // --- SISTEM DETEKSI KONFIGURASI ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'nailul-muna-v4-3';
         let firebaseConfig = {};
-        try {
-            firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        } catch (e) {
-            console.error("Firebase config error:", e);
+
+        // Cek apakah variabel simulasi ada, jika tidak pakai myFirebaseConfig
+        if (typeof __firebase_config !== 'undefined' && __firebase_config !== "" && __firebase_config !== "{}") {
+            try {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } catch(e) {
+                firebaseConfig = myFirebaseConfig;
+            }
+        } else {
+            firebaseConfig = myFirebaseConfig;
         }
 
         const app = initializeApp(firebaseConfig);
@@ -410,7 +423,7 @@
 
         const getMasterDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'configs', 'master');
 
-        // --- EXPORT FUNCTIONS TO WINDOW IMMEDIATELY ---
+        // --- EXPORT FUNCTIONS TO WINDOW ---
         window.showToast = function(msg, color = "green") {
             const toast = document.getElementById('toast');
             if (toast) {
@@ -511,24 +524,32 @@
                     ${item} <button onclick="window.deleteMasterItem('${key}', '${item}')" class="text-red-400">×</button>
                 </div>
             `).join('');
-            document.getElementById('list-tingkatan').innerHTML = render(window.dataTingkatan, 'dataTingkatan');
-            document.getElementById('list-kelas').innerHTML = render(window.dataKelas, 'dataKelas');
-            document.getElementById('list-mapel').innerHTML = render(window.dataMapel, 'dataMapel');
+            const listTingkatan = document.getElementById('list-tingkatan');
+            const listKelas = document.getElementById('list-kelas');
+            const listMapel = document.getElementById('list-mapel');
+            
+            if(listTingkatan) listTingkatan.innerHTML = render(window.dataTingkatan, 'dataTingkatan');
+            if(listKelas) listKelas.innerHTML = render(window.dataKelas, 'dataKelas');
+            if(listMapel) listMapel.innerHTML = render(window.dataMapel, 'dataMapel');
             
             const tkSelect = document.getElementById('jadwal-tingkatan-select');
-            const currentVal = tkSelect.value;
-            tkSelect.innerHTML = '<option value="">-- Pilih Tingkatan --</option>' + 
-                window.dataTingkatan.map(t => `<option value="${t}">${t}</option>`).join('');
-            tkSelect.value = currentVal;
+            if(tkSelect) {
+                const currentVal = tkSelect.value;
+                tkSelect.innerHTML = '<option value="">-- Pilih Tingkatan --</option>' + 
+                    window.dataTingkatan.map(t => `<option value="${t}">${t}</option>`).join('');
+                tkSelect.value = currentVal;
+            }
 
-            document.getElementById('masuk-tingkatan-select').innerHTML = window.dataTingkatan.map(t => `<option value="${t}">${t}</option>`).join('');
-            document.getElementById('masuk-kelas-select').innerHTML = window.dataKelas.map(k => `<option value="${k}">${k}</option>`).join('');
+            const masukTingkatan = document.getElementById('masuk-tingkatan-select');
+            const masukKelas = document.getElementById('masuk-kelas-select');
+            if(masukTingkatan) masukTingkatan.innerHTML = window.dataTingkatan.map(t => `<option value="${t}">${t}</option>`).join('');
+            if(masukKelas) masukKelas.innerHTML = window.dataKelas.map(k => `<option value="${k}">${k}</option>`).join('');
         };
 
         window.renderJadwalEditor = function() {
             const tk = document.getElementById('jadwal-tingkatan-select').value;
             const container = document.getElementById('jadwal-editor-container');
-            if(!tk) { container.innerHTML = ''; return; }
+            if(!tk || !container) { if(container) container.innerHTML = ''; return; }
             const hariList = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
             container.innerHTML = hariList.map(hari => {
                 const slots = (window.configJadwal[tk] && window.configJadwal[tk][hari]) ? window.configJadwal[tk][hari] : [];
@@ -576,8 +597,8 @@
                 <div class="bg-slate-50 p-5 rounded-3xl border">
                     <p class="text-[9px] font-bold text-blue-900 uppercase mb-3 tracking-widest">Pengurus ${i+1}</p>
                     <div class="space-y-3">
-                        <input type="text" value="${off.nama}" placeholder="Nama" class="w-full p-3 bg-white border rounded-xl text-sm officer-name-input">
-                        <input type="text" value="${off.wa}" placeholder="WhatsApp (628...)" class="w-full p-3 bg-white border rounded-xl text-sm officer-wa-input">
+                        <input type="text" value="${off.nama || ''}" placeholder="Nama" class="w-full p-3 bg-white border rounded-xl text-sm officer-name-input">
+                        <input type="text" value="${off.wa || ''}" placeholder="WhatsApp (628...)" class="w-full p-3 bg-white border rounded-xl text-sm officer-wa-input">
                     </div>
                 </div>
             `).join('');
@@ -671,10 +692,15 @@
         window.startEnrollCamera = async function() {
             try {
                 streamEnroll = await navigator.mediaDevices.getUserMedia({ video: true });
-                document.getElementById('webcam-enroll').srcObject = streamEnroll;
-                document.getElementById('enroll-overlay').classList.remove('hidden');
-                document.getElementById('btn-enroll-action').disabled = false;
-                document.getElementById('btn-enroll-action').classList.remove('opacity-50');
+                const videoEl = document.getElementById('webcam-enroll');
+                if(videoEl) videoEl.srcObject = streamEnroll;
+                const overlay = document.getElementById('enroll-overlay');
+                if(overlay) overlay.classList.remove('hidden');
+                const btn = document.getElementById('btn-enroll-action');
+                if(btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50');
+                }
             } catch (e) { window.showToast("Kamera gagal", "red"); }
         };
 
@@ -683,9 +709,10 @@
             if(!sid) return;
             try {
                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'santri', sid), { faceRegistered: true });
-                document.getElementById('enroll-success-overlay').classList.remove('hidden');
+                const successOverlay = document.getElementById('enroll-success-overlay');
+                if(successOverlay) successOverlay.classList.remove('hidden');
                 setTimeout(() => {
-                    document.getElementById('enroll-success-overlay').classList.add('hidden');
+                    if(successOverlay) successOverlay.classList.add('hidden');
                     window.renderPendaftaranWajah();
                 }, 2000);
             } catch (e) {
@@ -704,10 +731,15 @@
         window.startScanCamera = async function() {
             try {
                 streamScan = await navigator.mediaDevices.getUserMedia({ video: true });
-                document.getElementById('webcam-scan').srcObject = streamScan;
-                document.getElementById('scan-ui-overlay').classList.remove('hidden');
-                document.getElementById('btn-confirm-scan').disabled = false;
-                document.getElementById('btn-confirm-scan').classList.remove('opacity-50');
+                const videoEl = document.getElementById('webcam-scan');
+                if(videoEl) videoEl.srcObject = streamScan;
+                const overlay = document.getElementById('scan-ui-overlay');
+                if(overlay) overlay.classList.remove('hidden');
+                const btn = document.getElementById('btn-confirm-scan');
+                if(btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50');
+                }
             } catch (e) { window.showToast("Kamera gagal", "red"); }
         };
 
@@ -768,6 +800,7 @@
         window.openOfficerModal = (nis) => {
             window.selectedNisForReport = nis;
             const list = document.getElementById('officer-selection-list');
+            if(!list) return;
             const activeOffs = window.dataPengurus.filter(o => o.nama && o.wa);
             if(activeOffs.length === 0) {
                 list.innerHTML = '<p class="text-xs text-red-500">Petugas belum diatur.</p>';
@@ -778,10 +811,14 @@
                     </button>
                 `).join('');
             }
-            document.getElementById('officer-modal').classList.remove('hidden');
+            const modal = document.getElementById('officer-modal');
+            if(modal) modal.classList.remove('hidden');
         };
 
-        window.closeOfficerModal = () => document.getElementById('officer-modal').classList.add('hidden');
+        window.closeOfficerModal = () => {
+            const modal = document.getElementById('officer-modal');
+            if(modal) modal.classList.add('hidden');
+        };
 
         window.sendWANotifToOfficer = (wa) => {
             const s = window.dataSantriAktif.find(item => item.nis === window.selectedNisForReport);
@@ -792,7 +829,7 @@
         };
 
         window.handleFormSubmit = async (e) => {
-            e.preventDefault();
+            if(e) e.preventDefault();
             const data = Object.fromEntries(new FormData(e.target));
             try {
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'santri'), { ...data, faceRegistered: false, timestamp: Date.now() });
@@ -826,9 +863,12 @@
                 
                 if (localStorage.getItem('logged_nm') === 'true') {
                     window.currentUserRole = localStorage.getItem('role_nm') || 'user';
-                    document.getElementById('login-screen').classList.add('hidden');
-                    document.getElementById('main-sidebar').classList.remove('hidden');
-                    document.getElementById('main-content').classList.remove('hidden');
+                    const loginScreen = document.getElementById('login-screen');
+                    const mainSidebar = document.getElementById('main-sidebar');
+                    const mainContent = document.getElementById('main-content');
+                    if(loginScreen) loginScreen.classList.add('hidden');
+                    if(mainSidebar) mainSidebar.classList.remove('hidden');
+                    if(mainContent) mainContent.classList.remove('hidden');
                     window.applyPermissions();
                 }
                 const snap = await getDoc(getMasterDocRef());
@@ -856,8 +896,11 @@
 
         const startAuth = async () => {
             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-                else await signInAnonymously(auth);
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token && __initial_auth_token !== "") {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
             } catch (e) {
                 console.error("Auth error:", e);
             }
