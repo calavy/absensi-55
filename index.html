@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Presensi Nailul Muna</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .sidebar-link.active { background-color: #1e40af; border-left: 4px solid #fbbf24; }
+        
+        /* Animasi Scanner */
+        .scanner-line {
+            position: absolute;
+            width: 100%; height: 3px;
+            background: linear-gradient(to bottom, transparent, #3b82f6);
+            box-shadow: 0 0 15px #3b82f6;
+            animation: scan 2.5s ease-in-out infinite;
+            z-index: 10;
+        }
+        @keyframes scan {
+            0% { top: 0%; }
+            50% { top: 100%; }
+            100% { top: 0%; }
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 1.5rem;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-blue-900 text-white flex flex-col hidden md:flex shadow-2xl">
+        <div class="p-6 text-2xl font-bold border-b border-blue-800 flex items-center gap-3">
+            <i class="fas fa-mosque text-yellow-400"></i>
+            <span class="tracking-tight">Nailul Muna</span>
+        </div>
+        <nav class="flex-1 mt-6 overflow-y-auto custom-scrollbar">
+            <button onclick="window.showPage('dashboard')" id="btn-dashboard" class="sidebar-link active w-full flex items-center p-4 hover:bg-blue-800 transition-all">
+                <i class="fas fa-home w-8 text-blue-300"></i> Dashboard
+            </button>
+            <button onclick="window.showPage('masuk')" id="btn-masuk" class="sidebar-link w-full flex items-center p-4 hover:bg-blue-800 transition-all">
+                <i class="fas fa-user-plus w-8 text-blue-300"></i> Daftar Santri
+            </button>
+            <button onclick="window.showPage('scan-wajah')" id="btn-scan-wajah" class="sidebar-link w-full flex items-center p-4 hover:bg-blue-800 transition-all">
+                <i class="fas fa-camera w-8 text-blue-300"></i> Scan Absensi
+            </button>
+            <button onclick="window.showPage('aktif')" id="btn-aktif" class="sidebar-link w-full flex items-center p-4 hover:bg-blue-800 transition-all">
+                <i class="fas fa-users w-8 text-blue-300"></i> Data Santri
+            </button>
+            <button onclick="window.showPage('riwayat')" id="btn-riwayat" class="sidebar-link w-full flex items-center p-4 hover:bg-blue-800 transition-all">
+                <i class="fas fa-history w-8 text-blue-300"></i> Riwayat Absen
+            </button>
+        </nav>
+        <div class="p-4 border-t border-blue-800">
+            <div id="db-status" class="flex items-center gap-2 text-[10px] font-bold uppercase text-red-400">
+                <span class="w-2 h-2 rounded-full bg-red-400"></span> Database Terputus
+            </div>
+            <div id="ai-status" class="flex items-center gap-2 text-[10px] font-bold uppercase text-yellow-400 mt-2">
+                <span class="w-2 h-2 rounded-full bg-yellow-400"></span> Memuat AI...
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col">
+        <!-- Header -->
+        <header class="bg-white border-b p-4 flex justify-between items-center px-8 shadow-sm">
+            <h2 id="page-title" class="text-xl font-bold text-gray-800 uppercase tracking-wide">Dashboard</h2>
+            <div class="flex items-center gap-4">
+                <div class="text-right">
+                    <p id="current-time" class="text-lg font-bold text-blue-900 leading-none">00:00:00</p>
+                    <span id="current-date" class="text-[10px] text-gray-400 font-medium">Memuat tanggal...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <div id="content-area" class="flex-1 overflow-y-auto p-6 lg:p-10 custom-scrollbar">
+            
+            <!-- Dashboard -->
+            <div id="page-dashboard" class="page-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-l-8 border-l-blue-600">
+                        <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Total Santri Terdaftar</p>
+                        <h3 class="text-4xl font-black text-blue-900 mt-1" id="stat-total">0</h3>
+                    </div>
+                    <div class="bg-white p-8 rounded-3xl shadow-sm border border-l-8 border-l-green-600">
+                        <p class="text-gray-400 text-xs font-bold uppercase tracking-wider">Hadir Hari Ini</p>
+                        <h3 class="text-4xl font-black text-green-600 mt-1" id="stat-hadir">0</h3>
+                    </div>
+                </div>
+                <div class="bg-blue-900 p-12 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
+                    <div class="relative z-10">
+                        <h1 class="text-4xl font-black mb-4">Sistem Presensi Santri</h1>
+                        <p class="text-blue-100 max-w-lg opacity-80 leading-relaxed">Selamat datang di sistem manajemen biometrik Nailul Muna. Gunakan teknologi pengenalan wajah untuk pencatatan kehadiran yang aman dan cepat.</p>
+                    </div>
+                    <i class="fas fa-mosque absolute -right-10 -bottom-10 text-[15rem] opacity-10 rotate-12"></i>
+                </div>
+            </div>
+
+            <!-- Registrasi -->
+            <div id="page-masuk" class="page-content hidden">
+                <div class="max-w-xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+                    <h3 class="text-xl font-bold text-blue-900 mb-6 flex items-center gap-2">
+                        <i class="fas fa-user-plus text-blue-600"></i> Registrasi Santri Baru
+                    </h3>
+                    <form onsubmit="window.handleRegister(event)" class="space-y-6">
+                        <div class="space-y-4">
+                            <input type="text" name="nis" placeholder="Nomor Induk Santri (NIS)" required class="w-full p-4 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 font-medium">
+                            <input type="text" name="nama" placeholder="Nama Lengkap Santri" required class="w-full p-4 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 font-medium">
+                        </div>
+                        <div class="bg-gray-900 p-6 rounded-3xl text-center relative overflow-hidden border-4 border-gray-200">
+                            <video id="reg-video" autoplay playsinline class="w-48 h-48 mx-auto rounded-full object-cover border-4 border-blue-500 shadow-xl"></video>
+                            <div class="mt-4 flex justify-center gap-3">
+                                <button type="button" onclick="window.startCam('reg-video')" class="bg-white/10 text-white px-5 py-2 rounded-xl text-[10px] font-bold hover:bg-white/20 uppercase">Buka Kamera</button>
+                                <button type="button" onclick="window.captureFace()" class="bg-blue-600 text-white px-5 py-2 rounded-xl text-[10px] font-bold shadow-lg hover:bg-blue-500 uppercase">Rekam Wajah</button>
+                            </div>
+                            <p id="reg-msg" class="text-[10px] mt-3 text-gray-400 italic">Posisikan wajah tepat di tengah lingkaran</p>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-900 text-white py-4 rounded-2xl font-bold text-lg shadow-xl hover:bg-black transition-all">SIMPAN DATA SANTRI</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Scan Absensi -->
+            <div id="page-scan-wajah" class="page-content hidden">
+                <div class="max-w-3xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                    <div class="video-container aspect-square md:aspect-auto">
+                        <video id="scan-video" autoplay playsinline class="w-full h-full object-cover scale-x-[-1]"></video>
+                        <canvas id="scan-canvas"></canvas>
+                        <div class="scanner-line"></div>
+                    </div>
+                    <div class="space-y-6">
+                        <div class="bg-white p-8 rounded-3xl shadow-sm border text-center border-gray-100">
+                            <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-2">Status Deteksi</p>
+                            <h3 id="det-name" class="text-3xl font-black text-blue-900 uppercase tracking-tighter">Mencari Wajah...</h3>
+                            <div id="det-status" class="mt-4 inline-block px-4 py-1 rounded-full text-[10px] font-bold uppercase bg-gray-100 text-gray-400">Sistem Siap</div>
+                        </div>
+                        <button id="btn-absen" onclick="window.doAbsen()" disabled class="w-full bg-green-600 text-white py-6 rounded-3xl font-black text-xl shadow-2xl disabled:bg-gray-100 disabled:text-gray-300 transform active:scale-95 transition-all">HADIR SEKARANG</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- List Santri -->
+            <div id="page-aktif" class="page-content hidden">
+                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-blue-900 text-white text-[10px] uppercase tracking-widest">
+                            <tr><th class="p-6">No</th><th class="p-6">NIS</th><th class="p-6">Nama Lengkap</th><th class="p-6 text-center">Tindakan</th></tr>
+                        </thead>
+                        <tbody id="santri-table" class="divide-y text-sm font-medium text-gray-600"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Riwayat -->
+            <div id="page-riwayat" class="page-content hidden">
+                <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                    <table class="w-full text-left">
+                        <thead class="bg-blue-900 text-white text-[10px] uppercase tracking-widest">
+                            <tr><th class="p-6">Waktu Absen</th><th class="p-6">Nama Santri</th><th class="p-6 text-center">Status</th></tr>
+                        </thead>
+                        <tbody id="riwayat-table" class="divide-y text-xs text-gray-600"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================
+        // KONFIGURASI FIREBASE ANDA
+        // ==========================================
+        const manualConfig = {
+            apiKey: "AIzaSyA3USbfzVYgH0zpmHlYewurFeFSC4P_y28",
+            authDomain: "absensi-wajah-a5262.firebaseapp.com",
+            projectId: "absensi-wajah-a5262",
+            storageBucket: "absensi-wajah-a5262.firebasestorage.app",
+            messagingSenderId: "136628217360",
+            appId: "1:136628217360:web:588f892c0910238ffacc95",
+            measurementId: "G-LL6E6Z1TSX"
+        };
+
+        const config = (typeof __firebase_config !== 'undefined' && __firebase_config !== '{}') 
+            ? JSON.parse(__firebase_config) 
+            : manualConfig;
+
+        const app = initializeApp(config);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const santriCol = "santri_nailulmuna";
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'nailul-muna-official';
+
+        let isAiReady = false;
+        let descriptorTemp = null;
+        let santriList = [];
+        let detectedSantri = null;
+
+        // Inisialisasi AI
+        async function loadAI() {
+            const URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+            try {
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(URL)
+                ]);
+                isAiReady = true;
+                const status = document.getElementById('ai-status');
+                status.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400"></span> AI AKTIF';
+                status.className = "flex items-center gap-2 text-[10px] font-bold uppercase text-green-400 mt-2";
+            } catch (err) { console.error("AI Model Error", err); }
+        }
+
+        // Navigasi
+        window.showPage = (id) => {
+            document.querySelectorAll('.page-content').forEach(p => p.classList.add('hidden'));
+            document.getElementById('page-' + id).classList.remove('hidden');
+            document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+            document.getElementById('btn-' + id).classList.add('active');
+            document.getElementById('page-title').innerText = id.toUpperCase().replace('-', ' ');
+            
+            // Bersihkan kamera saat pindah halaman
+            const stopCameras = () => {
+                const videos = document.querySelectorAll('video');
+                videos.forEach(v => { if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); });
+            };
+            
+            if (id !== 'scan-wajah' && id !== 'masuk') stopCameras();
+            if (id === 'scan-wajah') startScan();
+        };
+
+        // Kontrol Kamera
+        window.startCam = async (id) => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                document.getElementById(id).srcObject = stream;
+            } catch (e) { alert("Akses kamera ditolak atau tidak tersedia."); }
+        };
+
+        window.captureFace = async () => {
+            if (!isAiReady) return alert("Menunggu sistem AI siap...");
+            const video = document.getElementById('reg-video');
+            if(!video.srcObject) return alert("Silakan aktifkan kamera terlebih dahulu.");
+            
+            const result = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+            if (result) {
+                descriptorTemp = Array.from(result.descriptor);
+                document.getElementById('reg-msg').innerText = "SIDIK WAJAH TEREKAM! ✅";
+                document.getElementById('reg-msg').className = "text-[10px] mt-3 text-green-400 font-bold uppercase";
+            } else { alert("Wajah tidak terdeteksi dengan jelas. Pastikan cahaya cukup."); }
+        };
+
+        window.handleRegister = async (e) => {
+            e.preventDefault();
+            if (!descriptorTemp) return alert("Silakan ambil sidik wajah santri dulu!");
+            const fd = new FormData(e.target);
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', santriCol), {
+                    nis: fd.get('nis'),
+                    nama: fd.get('nama'),
+                    descriptor: descriptorTemp,
+                    created_at: Date.now()
+                });
+                alert("Santri Berhasil Terdaftar!");
+                e.target.reset();
+                descriptorTemp = null;
+                window.showPage('aktif');
+            } catch (err) { alert("Gagal menyimpan data ke database. Cek konfigurasi Firebase."); }
+        };
+
+        // Pemindaian Wajah
+        let scanInterval = null;
+        async function startScan() {
+            const video = document.getElementById('scan-video');
+            const canvas = document.getElementById('scan-canvas');
+            await window.startCam('scan-video');
+            
+            if (scanInterval) clearInterval(scanInterval);
+            scanInterval = setInterval(async () => {
+                if (!isAiReady || !video.srcObject) return;
+                
+                const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
+                const size = { width: video.offsetWidth, height: video.offsetHeight };
+                faceapi.matchDimensions(canvas, size);
+                const resized = faceapi.resizeResults(detections, size);
+                canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
+                if (resized.length > 0 && santriList.length > 0) {
+                    const labeled = santriList.filter(s => s.descriptor).map(s => new faceapi.LabeledFaceDescriptors(s.id, [new Float32Array(s.descriptor)]));
+                    if(labeled.length > 0) {
+                        faceMatcher = new faceapi.FaceMatcher(labeled, 0.6);
+                        const bestMatch = faceMatcher.findBestMatch(resized[0].descriptor);
+                        
+                        if (bestMatch.label !== 'unknown') {
+                            detectedSantri = santriList.find(s => s.id === bestMatch.label);
+                            document.getElementById('det-name').innerText = detectedSantri.nama;
+                            document.getElementById('det-status').innerText = "Wajah Teridentifikasi";
+                            document.getElementById('det-status').className = "mt-4 inline-block px-4 py-1 rounded-full text-[10px] font-bold uppercase bg-green-100 text-green-600 border border-green-200";
+                            document.getElementById('btn-absen').disabled = false;
+                        } else {
+                            document.getElementById('det-name').innerText = "Mencari Wajah...";
+                            document.getElementById('det-status').innerText = "Tidak Dikenal";
+                            document.getElementById('det-status').className = "mt-4 inline-block px-4 py-1 rounded-full text-[10px] font-bold uppercase bg-red-100 text-red-600 border border-red-200";
+                            document.getElementById('btn-absen').disabled = true;
+                        }
+                    }
+                    faceapi.draw.drawDetections(canvas, resized);
+                }
+            }, 600);
+        }
+
+        window.doAbsen = async () => {
+            if (!detectedSantri) return;
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', "riwayat_absen"), {
+                    nama: detectedSantri.nama,
+                    nis: detectedSantri.nis,
+                    jam: new Date().toLocaleTimeString('id-ID'),
+                    timestamp: Date.now()
+                });
+                alert("Absensi " + detectedSantri.nama + " Berhasil!");
+                window.showPage('riwayat');
+            } catch (e) { alert("Gagal mencatat kehadiran."); }
+        };
+
+        // Sinkronisasi Data Firestore
+        const initData = () => {
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', santriCol), snap => {
+                santriList = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                document.getElementById('stat-total').innerText = santriList.length;
+                document.getElementById('santri-table').innerHTML = santriList.map((s,i) => `
+                    <tr>
+                        <td class="p-6">${i+1}</td>
+                        <td class="p-6 text-blue-600 font-bold">${s.nis}</td>
+                        <td class="p-6 uppercase font-bold text-gray-700">${s.nama}</td>
+                        <td class="p-6 text-center">
+                            <button onclick="window.delSantri('${s.id}')" class="text-red-500 hover:bg-red-50 px-4 py-1.5 rounded-xl border border-red-100 text-[10px] font-bold uppercase transition-all">Hapus</button>
+                        </td>
+                    </tr>
+                `).join('');
+            });
+
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', "riwayat_absen"), snap => {
+                const logs = snap.docs.map(d => d.data()).sort((a,b) => b.timestamp - a.timestamp);
+                document.getElementById('stat-hadir').innerText = logs.filter(l => new Date(l.timestamp).toDateString() === new Date().toDateString()).length;
+                document.getElementById('riwayat-table').innerHTML = logs.map(l => `
+                    <tr>
+                        <td class="p-6 font-bold text-blue-900">${l.jam}</td>
+                        <td class="p-6 uppercase font-bold text-gray-700">${l.nama}</td>
+                        <td class="p-6 text-center"><span class="bg-green-100 text-green-700 px-4 py-1 rounded-full font-bold">HADIR</span></td>
+                    </tr>
+                `).join('');
+            });
+        };
+
+        window.delSantri = async (id) => { if(confirm("Hapus data santri ini selamanya?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', santriCol, id)); };
+
+        // Start App
+        window.onload = async () => {
+            loadAI();
+            
+            // Proses Auth (RULE 3)
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) { console.error("Autentikasi Gagal", e); }
+
+            onAuthStateChanged(auth, user => {
+                const dbInd = document.getElementById('db-status');
+                if(user) {
+                    dbInd.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-400"></span> DATABASE AKTIF';
+                    dbInd.className = "flex items-center gap-2 text-[10px] font-bold uppercase text-green-400";
+                    initData();
+                }
+            });
+
+            // Jam & Tanggal
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('current-time').innerText = now.toLocaleTimeString('id-ID');
+                document.getElementById('current-date').innerText = now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
