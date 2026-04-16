@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title id="app-window-title">Manajemen Santri - Nailul Muna v6.1</title>
+    <title id="app-window-title">Manajemen Santri - Nailul Muna v6.2</title>
     
     <!-- Library Eksternal -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -80,7 +80,7 @@
                         <img id="login-logo-img" src="" class="hidden w-full h-full object-cover">
                     </div>
                     <h1 id="login-pondok-name" class="text-xl font-bold tracking-tight text-white uppercase">Nailul Muna</h1>
-                    <p class="text-blue-300 text-[10px] mt-1 uppercase tracking-widest font-semibold">Sistem Terintegrasi v6.1</p>
+                    <p class="text-blue-300 text-[10px] mt-1 uppercase tracking-widest font-semibold">Sistem Terintegrasi v6.2</p>
                 </div>
             </div>
 
@@ -99,7 +99,7 @@
                     </button>
                 </form>
                 <div id="setup-status" class="text-[9px] text-center font-bold text-slate-400 uppercase tracking-tighter flex items-center justify-center gap-2">
-                    <i class="fas fa-circle-notch fa-spin"></i> Inisialisasi Database Cloud...
+                    <i class="fas fa-circle-notch fa-spin"></i> Sinkronisasi Cloud...
                 </div>
             </div>
         </div>
@@ -411,7 +411,7 @@
                                 <div class="space-y-4">
                                     <div class="flex items-center justify-between border-b pb-2">
                                         <h4 class="text-xs font-black uppercase text-indigo-600 tracking-widest">Jadwal Ngaji (Per Kelas)</h4>
-                                        <select id="select-tingkatan-jadwal" onchange="window.renderJadwalEditor()" class="p-2 bg-indigo-50 border-indigo-100 rounded-lg text-[10px] font-bold outline-none text-indigo-900"></select>
+                                        <select id="select-tingkatan-jadwal" onchange="window.saveTempNgaji(); window.renderJadwalEditor()" class="p-2 bg-indigo-50 border-indigo-100 rounded-lg text-[10px] font-bold outline-none text-indigo-900"></select>
                                     </div>
                                     <div id="ngaji-schedule-grid" class="grid grid-cols-2 gap-3 p-4 bg-slate-50 rounded-2xl border border-dashed"></div>
                                 </div>
@@ -444,7 +444,8 @@
                         </div>
 
                         <div class="pt-10 mt-10 border-t flex justify-end">
-                            <button onclick="window.saveAllSettings()" class="w-full md:w-auto bg-blue-600 text-white px-12 py-5 rounded-2xl font-black shadow-xl hover:bg-blue-700 transition-all text-xs tracking-widest uppercase">
+                            <button id="btn-save-settings" onclick="window.saveAllSettings()" class="w-full md:w-auto bg-blue-600 text-white px-12 py-5 rounded-2xl font-black shadow-xl hover:bg-blue-700 transition-all text-xs tracking-widest uppercase flex items-center justify-center gap-2">
+                                <span id="save-spinner" class="hidden"><i class="fas fa-circle-notch fa-spin"></i></span>
                                 Simpan Semua Perubahan Ke Cloud
                             </button>
                         </div>
@@ -504,8 +505,10 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDoc, deleteDoc, onSnapshot, addDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Global Variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'nailul-muna-v6-2';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyA3USbfzVYgH0zpmHlYewurFeFSC4P_y28",
+            apiKey: "",
             authDomain: "absensi-wajah-a5262.firebaseapp.com",
             projectId: "absensi-wajah-a5262",
             storageBucket: "absensi-wajah-a5262.firebasestorage.app",
@@ -513,7 +516,6 @@
             appId: "1:136628217360:web:588f892c0910238ffacc95",
         };
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'nailul-muna-v6-1';
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -542,11 +544,13 @@
         window.currentSessionStatus = "Normal";
         let activeStream = null;
         let attChart = null;
+        let currentUser = null;
 
-        const getMasterDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'configs', 'master');
+        // Path Konfigurasi (Rule 1)
+        const getMasterDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'master');
 
-        // --- AUTH ---
-        const startAuth = async () => {
+        // --- AUTH & DATA LOAD ---
+        const initApp = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -554,15 +558,16 @@
                     await signInAnonymously(auth);
                 }
             } catch (e) {
-                document.getElementById('setup-status').innerHTML = "Mode Offline Terdeteksi";
-                const btn = document.getElementById('btn-login-action');
-                if(btn) btn.disabled = false;
+                console.error("Auth Error", e);
+                document.getElementById('setup-status').innerHTML = "Koneksi Bermasalah";
+                document.getElementById('btn-login-action').disabled = false;
             }
         };
 
         onAuthStateChanged(auth, async (user) => {
+            currentUser = user;
             if (user) {
-                document.getElementById('setup-status').innerHTML = "Database Cloud Aktif";
+                document.getElementById('setup-status').innerHTML = "Cloud Terhubung";
                 const btnLogin = document.getElementById('btn-login-action');
                 if(btnLogin) {
                     btnLogin.innerText = "MASUK KE PANEL";
@@ -571,6 +576,7 @@
                     btnLogin.classList.replace('text-slate-400', 'text-white');
                 }
 
+                // Load Initial Config
                 const snap = await getDoc(getMasterDocRef());
                 if(snap.exists()){
                     const d = snap.data();
@@ -587,13 +593,13 @@
                     updateUIFromSettings();
                 }
 
-                // Listeners
+                // Snapshots
                 onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'santri_induk'), s => {
                     window.dataSantriMaster = s.docs.map(d => ({ id: d.id, ...d.data() }));
                     window.updateDashboard();
                     window.renderDataIndukTable();
                     window.updateAktivasiDropdowns();
-                }, (err) => console.log(err));
+                });
                 
                 onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'santri_aktif'), s => {
                     window.dataSantriAktif = s.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -601,24 +607,86 @@
                     window.renderAktifTable();
                     window.renderRekapTable();
                     window.updateEnrollSelector();
-                }, (err) => console.log(err));
+                });
                 
                 onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'presensi'), s => {
                     window.dataPresensi = s.docs.map(d => ({ id: d.id, ...d.data() }));
                     window.updateDashboard();
                     window.renderRekapTable();
-                }, (err) => console.log(err));
+                });
             }
         });
 
-        // --- DASHBOARD ---
+        // --- MANAJEMEN PENGATURAN (CLOUD SAVE) ---
+        window.saveTempNgaji = () => {
+            const curTk = document.getElementById('select-tingkatan-jadwal').value;
+            if(curTk) {
+                const inputs = document.querySelectorAll('.ngaji-input');
+                if(inputs.length > 0) {
+                    window.jadwalNgajiTingkatan[curTk] = Array.from(inputs).map(i => i.value);
+                }
+            }
+        };
+
+        window.saveAllSettings = async () => {
+            if(!currentUser) return window.showToast("Sesi berakhir, silakan login ulang", "red");
+            
+            const btn = document.getElementById('btn-save-settings');
+            const spinner = document.getElementById('save-spinner');
+            
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+
+            // Collect Data
+            window.saveTempNgaji(); // Ensure current visible ngaji times are saved to state
+            
+            const tkList = Array.from(document.querySelectorAll('.tingkatan-input')).map(i => i.value).filter(v => v !== "");
+            const sholatTimes = {}; 
+            document.querySelectorAll('.sholat-input').forEach(i => sholatTimes[i.dataset.sholat] = i.value);
+            
+            const pNames = document.querySelectorAll('.off-name'); 
+            const pWas = document.querySelectorAll('.off-wa');
+            const newPengurus = Array.from(pNames).map((el, i) => ({ nama: el.value, wa: pWas[i].value }));
+
+            const updateData = {
+                pondokIdentity: { 
+                    name: document.getElementById('set-pondok-name').value, 
+                    logo: window.pondokIdentity.logo 
+                },
+                dataTingkatan: tkList,
+                jadwalSholatTimes: sholatTimes,
+                jadwalMujahadah: document.getElementById('mujahadah-time').value,
+                jadwalNgajiTingkatan: window.jadwalNgajiTingkatan,
+                dataPengurus: newPengurus,
+                apiWAEnabled: document.getElementById('set-api-enabled').checked,
+                apiWAToken: document.getElementById('set-api-token').value,
+                apiWAReportTime: document.getElementById('set-api-report-time').value,
+                lastUpdated: Date.now()
+            };
+
+            try {
+                await setDoc(getMasterDocRef(), updateData, { merge: true });
+                window.showToast("Seluruh pengaturan berhasil disimpan ke Cloud", "green");
+                // Refresh local UI
+                window.dataTingkatan = tkList;
+                updateUIFromSettings();
+            } catch (e) {
+                console.error(e);
+                window.showToast("Gagal menyimpan ke Cloud: " + e.message, "red");
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        };
+
+        // --- DASHBOARD & ANALYTICS ---
         window.updateDashboard = () => {
             document.getElementById('stat-total-induk').innerText = window.dataSantriMaster.length;
             document.getElementById('stat-total-aktif').innerText = window.dataSantriAktif.length;
             const today = new Date().toLocaleDateString('id-ID');
             const logsToday = window.dataPresensi.filter(p => p.waktu && p.waktu.includes(today));
             document.getElementById('stat-hadir').innerText = logsToday.filter(p => p.status === 'Hadir').length;
-            document.getElementById('stat-alpa').innerText = window.dataSantriAktif.length - logsToday.length;
+            document.getElementById('stat-alpa').innerText = window.dataSantriAktif.length - logsToday.filter(p => p.status === 'Hadir' || p.status === 'Telat').length;
             
             const list = document.getElementById('recent-logs-list');
             const rec = [...window.dataPresensi].sort((a,b) => b.timestamp - a.timestamp).slice(0, 10);
@@ -640,7 +708,7 @@
         // --- MANAJEMEN DATA INDUK & EXCEL ---
         window.handleRegisterMaster = async (e) => {
             e.preventDefault();
-            if(!auth.currentUser) return;
+            if(!currentUser) return;
             const data = Object.fromEntries(new FormData(e.target));
             if(window.dataSantriMaster.some(s => String(s.nis) === String(data.nis))) return window.showToast("NIS sudah terdaftar!", "red");
             try {
@@ -696,15 +764,15 @@
                     if (key.includes('-')) {
                         const parts = key.split('-');
                         const tk = parts[0].trim();
-                        const jam = parts[1].toLowerCase().match(/\d+/);
-                        if (tk && jam) {
+                        const jamMatch = parts[1].toLowerCase().match(/\d+/);
+                        if (tk && jamMatch) {
                             if (!window.jadwalNgajiTingkatan[tk]) window.jadwalNgajiTingkatan[tk] = Array(7).fill("00:00");
-                            window.jadwalNgajiTingkatan[tk][parseInt(jam[0]) - 1] = val;
+                            window.jadwalNgajiTingkatan[tk][parseInt(jamMatch[0]) - 1] = val;
                         }
                     }
                 });
                 window.renderJadwalEditor();
-                window.showToast("Jadwal Berhasil Diperbarui dari Excel", "green");
+                window.showToast("Jadwal Berhasil Diperbarui dari Excel (Klik Simpan untuk Permanen)", "indigo");
                 input.value = "";
             };
             reader.readAsArrayBuffer(file);
@@ -722,6 +790,7 @@
         };
 
         window.activateSantri = async () => {
+            if(!currentUser) return;
             const sId = document.getElementById('select-santri-induk').value;
             const tk = document.getElementById('select-aktivasi-tingkatan').value;
             if(!sId || !tk) return window.showToast("Lengkapi data pilihan!", "red");
@@ -793,7 +862,7 @@
         }
 
         window.confirmAttendance = async () => {
-            if(!window.recognizedSantri || !auth.currentUser) return;
+            if(!window.recognizedSantri || !currentUser) return;
             try {
                 await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'presensi'), {
                     nis: window.recognizedSantri.nis, nama: window.recognizedSantri.nama, tingkatan: window.recognizedSantri.tingkatan,
@@ -810,12 +879,15 @@
             document.getElementById('cam-idle-scan').classList.remove('hidden');
         };
 
-        // --- SETTINGS ---
+        // --- CORE UI ---
         window.switchTab = (tabId) => {
+            if(tabId !== 'jadwal') window.saveTempNgaji(); // Save ngaji work before switching tabs
+            
             document.querySelectorAll('.setting-tab').forEach(b => b.classList.remove('active', 'bg-blue-600', 'text-white'));
             document.getElementById('tab-' + tabId).classList.add('active', 'bg-blue-600', 'text-white');
             document.querySelectorAll('.set-section').forEach(s => s.classList.add('hidden'));
             document.getElementById('set-' + tabId).classList.remove('hidden');
+            
             if(tabId === 'tingkatan') window.renderTingkatanEditor();
             if(tabId === 'jadwal') window.renderJadwalEditor();
             if(tabId === 'pengurus') window.renderPengurusGrid();
@@ -844,12 +916,15 @@
             sholatGrid.innerHTML = window.jadwalSholat.map(s => `
                 <div class="flex items-center gap-3">
                     <label class="w-20 text-[8px] font-black uppercase text-slate-400">${s}</label>
-                    <input type="time" value="${window.jadwalSholatTimes[s]}" class="sholat-input flex-1 p-3 bg-slate-50 border rounded-xl text-xs font-black" data-sholat="${s}">
+                    <input type="time" value="${window.jadwalSholatTimes[s] || '00:00'}" class="sholat-input flex-1 p-3 bg-slate-50 border rounded-xl text-xs font-black" data-sholat="${s}">
                 </div>
             `).join('');
             document.getElementById('mujahadah-time').value = window.jadwalMujahadah;
+            
             const tkSelect = document.getElementById('select-tingkatan-jadwal');
-            if(tkSelect.innerHTML === "") tkSelect.innerHTML = window.dataTingkatan.map(t => `<option value="${t}">${t.toUpperCase()}</option>`).join('');
+            const currentVal = tkSelect.value;
+            tkSelect.innerHTML = window.dataTingkatan.map(t => `<option value="${t}" ${t === currentVal ? 'selected' : ''}>${t.toUpperCase()}</option>`).join('');
+            
             const selectedTk = tkSelect.value;
             const ngajiTimes = window.jadwalNgajiTingkatan[selectedTk] || Array(7).fill("00:00");
             document.getElementById('ngaji-schedule-grid').innerHTML = ngajiTimes.map((t, i) => `
@@ -865,40 +940,12 @@
             grid.innerHTML = window.dataPengurus.map((p, i) => `
                 <div class="bg-slate-50 p-4 rounded-2xl space-y-2 border">
                     <p class="text-[8px] font-black text-blue-600 uppercase">Petugas Penerima ${i+1}</p>
-                    <input type="text" value="${p.nama}" placeholder="Nama" class="off-name w-full p-3 bg-white border rounded-xl text-xs font-bold">
-                    <input type="text" value="${p.wa}" placeholder="628..." class="off-wa w-full p-3 bg-white border rounded-xl text-xs">
+                    <input type="text" value="${p.nama || ''}" placeholder="Nama" class="off-name w-full p-3 bg-white border rounded-xl text-xs font-bold">
+                    <input type="text" value="${p.wa || ''}" placeholder="628..." class="off-wa w-full p-3 bg-white border rounded-xl text-xs">
                 </div>
             `).join('');
         };
 
-        window.saveAllSettings = async () => {
-            if(!auth.currentUser) return;
-            const tkList = Array.from(document.querySelectorAll('.tingkatan-input')).map(i => i.value).filter(v => v !== "");
-            const curTk = document.getElementById('select-tingkatan-jadwal').value;
-            if(curTk) window.jadwalNgajiTingkatan[curTk] = Array.from(document.querySelectorAll('.ngaji-input')).map(i => i.value);
-            const sholatTimes = {}; document.querySelectorAll('.sholat-input').forEach(i => sholatTimes[i.dataset.sholat] = i.value);
-            const pNames = document.querySelectorAll('.off-name'); const pWas = document.querySelectorAll('.off-wa');
-            const newPengurus = Array.from(pNames).map((el, i) => ({ nama: el.value, wa: pWas[i].value }));
-
-            const updateData = {
-                pondokIdentity: { name: document.getElementById('set-pondok-name').value, logo: window.pondokIdentity.logo },
-                dataTingkatan: tkList,
-                jadwalSholatTimes: sholatTimes,
-                jadwalMujahadah: document.getElementById('mujahadah-time').value,
-                jadwalNgajiTingkatan: window.jadwalNgajiTingkatan,
-                dataPengurus: newPengurus,
-                apiWAEnabled: document.getElementById('set-api-enabled').checked,
-                apiWAToken: document.getElementById('set-api-token').value,
-                apiWAReportTime: document.getElementById('set-api-report-time').value
-            };
-            try {
-                await setDoc(getMasterDocRef(), updateData, { merge: true });
-                window.showToast("Konfigurasi Cloud Disimpan", "green");
-                setTimeout(() => location.reload(), 500);
-            } catch (e) { window.showToast("Gagal Simpan", "red"); }
-        };
-
-        // --- CORE ---
         window.handleLogin = (e) => {
             e.preventDefault();
             const u = document.getElementById('login-username').value; const p = document.getElementById('login-password').value;
@@ -949,11 +996,11 @@
         
         window.showToast = (m, c) => { let t = document.getElementById('toast'); document.getElementById('toast-msg').innerText = m; t.classList.remove('translate-y-32', 'opacity-0'); setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 3000); };
         window.toggleSidebar = () => { document.getElementById('main-sidebar').classList.toggle('active'); document.getElementById('sidebar-overlay').classList.toggle('active'); };
-        window.deleteData = async (c, id) => { if(confirm("Hapus data ini?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', c, id)); };
+        window.deleteData = async (c, id) => { if(!currentUser) return; if(confirm("Hapus data ini?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', c, id)); };
 
         // --- CAMERA ---
         window.startCamera = async (id, p) => { let v = document.getElementById(id); let i = document.getElementById(`cam-idle-${p}`); let b = document.getElementById(`btn-${p}-action`); try { if(activeStream) activeStream.getTracks().forEach(t=>t.stop()); activeStream = await navigator.mediaDevices.getUserMedia({video:true}); v.srcObject = activeStream; v.classList.remove('hidden'); i.classList.add('hidden'); if(b){b.disabled=false; b.classList.remove('opacity-50');} } catch(e){window.showToast("Kamera error","red");} };
-        window.doEnroll = async () => { if(!auth.currentUser) return; let sid = document.getElementById('enroll-pilih-santri').value; if(!sid) return; try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'santri_aktif', sid), { faceRegistered: true }); document.getElementById('enroll-success-overlay').classList.remove('hidden'); setTimeout(()=>{document.getElementById('enroll-success-overlay').classList.add('hidden');}, 2000); } catch(e){window.showToast("Wajah Berhasil Disimpan","green");} };
+        window.doEnroll = async () => { if(!currentUser) return; let sid = document.getElementById('enroll-pilih-santri').value; if(!sid) return; try { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'santri_aktif', sid), { faceRegistered: true }); document.getElementById('enroll-success-overlay').classList.remove('hidden'); setTimeout(()=>{document.getElementById('enroll-success-overlay').classList.add('hidden');}, 2000); } catch(e){window.showToast("Wajah Berhasil Disimpan","green");} };
         window.updateEnrollSelector = () => { let s = document.getElementById('enroll-pilih-santri'); if(s) s.innerHTML = '<option value="">-- Pilih Santri --</option>' + window.dataSantriAktif.filter(a => !a.faceRegistered).map(a => `<option value="${a.id}">${a.nama.toUpperCase()} (${a.tingkatan})</option>`).join(''); };
 
         window.initCharts = () => {
@@ -965,7 +1012,7 @@
         };
 
         window.onload = () => {
-            startAuth();
+            initApp();
             setInterval(() => {
                 let n = new Date(); let t = document.getElementById('current-time'); if(t) t.innerText = n.toLocaleTimeString('id-ID'); let d = document.getElementById('current-date'); if(d) d.innerText = n.toLocaleDateString('id-ID',{weekday:'short',day:'numeric',month:'short'});
                 let nT = n.getHours().toString().padStart(2,'0')+":"+n.getMinutes().toString().padStart(2,'0');
@@ -984,6 +1031,9 @@
             const at = document.getElementById('set-api-token'); if(at) at.value = window.apiWAToken;
             const ar = document.getElementById('set-api-report-time'); if(ar) ar.value = window.apiWAReportTime;
             if(window.pondokIdentity.logo) updateLogoUI(window.pondokIdentity.logo);
+            
+            // Update Aktivasi Dropdowns
+            window.updateAktivasiDropdowns();
         }
     </script>
 </body>
