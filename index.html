@@ -486,9 +486,11 @@
         window.dataTingkatan = ["I'dad", "Ula", "Wustha", "Ulya"];
         window.pondokIdentity = { name: "Nailul Muna", logo: "" };
         window.adminPass = "admin";
+        window.jadwalSholat = ["Subuh", "Dzuhur", "Ashar", "Maghrib", "Isya"]; // Menambahkan definisi urutan sholat
         window.jadwalSholatTimes = { Subuh: "04:30", Dzuhur: "12:00", Ashar: "15:30", Maghrib: "18:00", Isya: "19:15" };
         window.jadwalMujahadah = "20:00";
         window.jadwalNgajiTingkatan = {}; 
+        window.dataPengurus = []; // Inisialisasi data pengurus
         let currentUser = null;
         let activeStream = null;
         let attChart = null;
@@ -599,6 +601,7 @@
                             window.jadwalSholatTimes = d.jadwalSholatTimes || window.jadwalSholatTimes;
                             window.jadwalMujahadah = d.jadwalMujahadah || window.jadwalMujahadah;
                             window.jadwalNgajiTingkatan = d.jadwalNgajiTingkatan || {};
+                            window.dataPengurus = d.dataPengurus || [];
                             updateUIFromSettings();
                         }
 
@@ -655,12 +658,21 @@
             const sholatTimes = {}; 
             document.querySelectorAll('.sholat-input').forEach(i => sholatTimes[i.dataset.sholat] = i.value);
 
+            // Simpan data pengurus
+            const offNames = document.querySelectorAll('.off-name');
+            const offWas = document.querySelectorAll('.off-wa');
+            const pengurusArr = Array.from(offNames).map((el, i) => ({
+                nama: el.value || "",
+                wa: offWas[i].value || ""
+            }));
+
             const finalData = {
                 pondokIdentity: { name: document.getElementById('set-pondok-name').value, logo: window.pondokIdentity.logo },
                 dataTingkatan: tkList,
                 jadwalSholatTimes: sholatTimes,
                 jadwalMujahadah: document.getElementById('mujahadah-time').value,
                 jadwalNgajiTingkatan: window.jadwalNgajiTingkatan,
+                dataPengurus: pengurusArr,
                 lastUpdated: Date.now()
             };
 
@@ -668,6 +680,7 @@
                 await setDoc(getMasterDocRef(), finalData, { merge: true });
                 window.showToast("Pengaturan tersimpan di Cloud", "green");
                 window.dataTingkatan = tkList;
+                window.dataPengurus = pengurusArr;
                 updateUIFromSettings();
             } catch (e) {
                 window.showToast("Gagal menyimpan ke Cloud", "red");
@@ -896,8 +909,18 @@
         window.renderPengurusGrid = () => {
             const grid = document.getElementById('pengurus-grid');
             if(!grid) return;
-            const pengurusArr = window.dataPengurus || Array(4).fill().map(() => ({ nama: "", wa: "" }));
-            grid.innerHTML = pengurusArr.map((p, i) => `<div class="bg-slate-50 p-4 rounded-2xl space-y-2 border shadow-sm"><p class="text-[8px] font-black text-blue-600 uppercase tracking-widest">Penerima WhatsApp ${i+1}</p><input type="text" value="${p.nama || ''}" placeholder="Nama Petugas" class="off-name w-full p-3 bg-white border rounded-xl text-xs font-bold"><input type="text" value="${p.wa || ''}" placeholder="Contoh: 628xxx" class="off-wa w-full p-3 bg-white border rounded-xl text-xs shadow-inner"></div>`).join('');
+            // Gunakan data dari window jika ada, atau buat array kosong baru
+            const pengurusArr = (window.dataPengurus && window.dataPengurus.length > 0) 
+                ? window.dataPengurus 
+                : Array(4).fill().map(() => ({ nama: "", wa: "" }));
+            
+            grid.innerHTML = pengurusArr.map((p, i) => `
+                <div class="bg-slate-50 p-4 rounded-2xl space-y-2 border shadow-sm">
+                    <p class="text-[8px] font-black text-blue-600 uppercase tracking-widest">Penerima WhatsApp ${i+1}</p>
+                    <input type="text" value="${p.nama || ''}" placeholder="Nama Petugas" class="off-name w-full p-3 bg-white border rounded-xl text-xs font-bold">
+                    <input type="text" value="${p.wa || ''}" placeholder="Contoh: 628xxx" class="off-wa w-full p-3 bg-white border rounded-xl text-xs shadow-inner">
+                </div>
+            `).join('');
         };
 
         window.handleMasterExcelUpload = (input) => {
