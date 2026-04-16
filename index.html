@@ -63,7 +63,7 @@
     <div id="sidebar-overlay" onclick="window.toggleSidebar()" class="fixed inset-0 z-[190]"></div>
 
     <!-- Login Screen -->
-    <div id="login-screen" class="fixed inset-0 z-[300] flex items-center justify-center p-6">
+    <div id="login-screen" class="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
         <div class="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
             <div class="p-10 text-center bg-blue-900 text-white relative">
                 <div class="absolute -top-10 -right-10 w-40 h-40 bg-blue-800 rounded-full opacity-40"></div>
@@ -459,14 +459,21 @@
 
         // APP ID & CONFIG (RULE 1)
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'nailul-muna-v6-6';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "",
-            authDomain: "absensi-wajah-a5262.firebaseapp.com",
-            projectId: "absensi-wajah-a5262",
-            storageBucket: "absensi-wajah-a5262.firebasestorage.app",
-            messagingSenderId: "136628217360",
-            appId: "1:136628217360:web:588f892c0910238ffacc95",
-        };
+        const apiKey = ""; // SDK akan mengambil kunci otomatis dari context
+
+        let firebaseConfig;
+        try {
+            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+                apiKey: apiKey,
+                authDomain: "absensi-wajah-a5262.firebaseapp.com",
+                projectId: "absensi-wajah-a5262",
+                storageBucket: "absensi-wajah-a5262.firebasestorage.app",
+                messagingSenderId: "136628217360",
+                appId: "1:136628217360:web:588f892c0910238ffacc95",
+            };
+        } catch (e) {
+            console.error("Gagal parse config", e);
+        }
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -489,7 +496,7 @@
         const getColPath = (colName) => collection(db, 'artifacts', appId, 'public', 'data', colName);
         const getMasterDocRef = () => doc(db, 'artifacts', appId, 'public', 'data', 'configs', 'master');
 
-        // --- DEFINE ALL UI FUNCTIONS FIRST TO PREVENT "is not a function" ERRORS ---
+        // --- DEFINE ALL UI FUNCTIONS FIRST ---
 
         window.renderDataIndukTable = () => {
             const searchInput = document.getElementById('search-induk');
@@ -555,11 +562,12 @@
         };
 
         // --- DATABASE LOGIC (RULE 3) ---
-        const startDatabaseSync = async () => {
+        const startDatabaseSync = async (retries = 0) => {
             const statusEl = document.getElementById('setup-status');
             const loginBtn = document.getElementById('btn-login-action');
 
             try {
+                // RULE 3: Auth BEFORE operations
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
@@ -569,11 +577,11 @@
                 onAuthStateChanged(auth, async (user) => {
                     currentUser = user;
                     if (user) {
+                        // Success Feedback
                         if(statusEl) {
                             statusEl.innerHTML = '<i class="fas fa-check-circle"></i> Database Online';
                             statusEl.className = "text-[9px] text-center font-bold status-ready uppercase tracking-tighter flex items-center justify-center gap-2";
                         }
-                        
                         if(loginBtn) {
                             loginBtn.innerText = "MASUK KE PANEL AMAN";
                             loginBtn.disabled = false;
@@ -581,6 +589,7 @@
                             loginBtn.classList.replace('text-slate-400', 'text-white');
                         }
 
+                        // Guard Firestore with Rule 1 pathing
                         const configSnap = await getDoc(getMasterDocRef());
                         if (configSnap.exists()) {
                             const d = configSnap.data();
@@ -593,12 +602,13 @@
                             updateUIFromSettings();
                         }
 
+                        // Listeners (Rule 2)
                         onSnapshot(getColPath('santri_induk'), (snap) => {
                             window.dataSantriMaster = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                             window.updateDashboard();
                             window.renderDataIndukTable();
                             window.updateAktivasiDropdowns();
-                        });
+                        }, (err) => console.error("Error induk snap:", err));
 
                         onSnapshot(getColPath('santri_aktif'), (snap) => {
                             window.dataSantriAktif = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -606,24 +616,28 @@
                             window.renderAktifTable();
                             window.renderRekapTable();
                             window.updateEnrollSelector();
-                        });
+                        }, (err) => console.error("Error aktif snap:", err));
 
                         onSnapshot(getColPath('presensi'), (snap) => {
                             window.dataPresensi = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                             window.updateDashboard();
                             window.renderRekapTable();
-                        });
+                        }, (err) => console.error("Error presensi snap:", err));
                     }
                 });
             } catch (error) {
-                console.error("Firebase Init Error:", error);
-                if(statusEl) {
-                    statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Database Gagal Terhubung';
-                    statusEl.className = "text-[9px] text-center font-bold status-error uppercase tracking-tighter flex items-center justify-center gap-2";
-                }
-                if(loginBtn) {
-                    loginBtn.innerText = "COBA LAGI";
-                    loginBtn.disabled = false;
+                if (retries < 5) {
+                    const delay = Math.pow(2, retries) * 1000;
+                    setTimeout(() => startDatabaseSync(retries + 1), delay);
+                } else {
+                    if(statusEl) {
+                        statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Koneksi Gagal (Retry Exhausted)';
+                        statusEl.className = "text-[9px] text-center font-bold status-error uppercase tracking-tighter flex items-center justify-center gap-2";
+                    }
+                    if(loginBtn) {
+                        loginBtn.innerText = "COBA LAGI";
+                        loginBtn.disabled = false;
+                    }
                 }
             }
         };
@@ -945,6 +959,8 @@
                 if(timeEl) timeEl.innerText = n.toLocaleTimeString('id-ID');
                 if(dateEl) dateEl.innerText = n.toLocaleDateString('id-ID', {weekday:'short', day:'numeric', month:'short'});
             }, 1000);
+            
+            // Auto Login if session exists
             if (localStorage.getItem('logged_nm') === 'true') {
                 window.currentUserRole = localStorage.getItem('role_nm');
                 const loginScreen = document.getElementById('login-screen');
